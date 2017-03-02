@@ -1,0 +1,84 @@
+--------------------------------------------------------------------------------
++main_loop()
++NOTE. gdb vuln-----------------------------------------------------------------
+|break 95 (read from user starts)
+|-------------------------------------------------------------------------------
+*Local variables of main_loop()-------------------------------------------------
+nread
+user
+pass
+ulen
+plen
+s
+rdbuf
+tbuf
+tbufsz
+--------------------------------------------------------------------------------
+* Observation: 87 bytes before the start of rdbuf
+- this can be checked by printing 88 %X (%08X might not work because of the rdbuf overflow)
+|-%08X nor %8X is not enough to print out 88 words of memory
+|-> Solution %n$X to create range query (i.e. update GenerateX)
+|-> Updated GenerateX.py (From test, 50 90 query overflows but 50 89 does not)
+|-> Just noticed that the number of read bytes is randomized, so it will be different from run to run:
+- On 88th %X, it prints out 0x58252065 (='%X e') the very beginning of rdbuf
+--------------------------------------------------------------------------------
+* Observation: from "gdb" it can be confirmed taht locals are closely clustered
+(gdb) p/a &user
+$5 = 0xbfffef78
+(gdb) p/a &pass
+$6 = 0xbfffef7c
+(gdb) p/a &ulen
+$7 = 0xbfffef80
+(gdb) p/a &plen
+$8 = 0xbfffef84
+(gdb) p/a &s
+$9 = 0xbfffef88
+(gdb) p/a &rdbuf
+$10 = 0xbfffef8c
+(gdb) p/a &tbuf
+$11 = 0xbfffef94
+(gdb) p/a &tbufsz
+$12 = 0xbfffef90
+(gdb) p/a &nread
+$13 = 0xbfffef98
+--------------------------------------------------------------------------------
+* Observation: rdbuf on stack has lower index at lower address
+(gdb) p &rdbuf[2]
+$1 = 0xbfffea42 "%X\nZ\332\002P\006"
+(gdb) p &rdbuf[3]
+$2 = 0xbfffea43 "X\nZ\332\002P\006"
+--------------------------------------------------------------------------------
+* Observation: From the observation above, conclude that "e %X ..." starts printing from high addr to low addr
+|-> this is false, because rdbuf is pointer to a location on a stack frame that is created by "alloca()" (man alloca)
+|-> following is proof
+(gdb) p &rdbuf[2]
+$1 = 0xbfffea42 "%X\nZ\332\002P\006"
+(gdb) p &rdbuf[3]
+$2 = 0xbfffea43 "X\nZ\332\002P\006"
+(gdb) p/a &rdbuf
+$3 = 0xbfffef8c
+(gdb) p/a &rdbuf[0]
+$4 = 0xbfffea40
+(gdb) p/a &rdbuf[1]
+$5 = 0xbfffea41
+(gdb) p/a &rdbuf[2]
+$6 = 0xbfffea42
+(gdb) p/a &rdbuf[3]
+$7 = 0xbfffea43
+(gdb) p/a &rdbuf[4]
+$8 = 0xbfffea44
+(gdb) p/a &rdbuf
+$9 = 0xbfffef8c
+(gdb) p/a &s
+$10 = 0xbfffef88
+(gdb) print rdbuf
+$11 = 0xbfffea40 "e %X\nZ\332\002P\006"
+--------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
+
+* Now lets identify the variables
+read()
+0
+rdbuf
+s-1
+
