@@ -76,49 +76,91 @@ HIGH ADDRESS!!!
 
 --------------------------------------------------------------------------------
 
++0xbfffeaa8 
 ...
 +0xbfffea80 0x5
-+0xbfffea7c 0x8049f14 (RA=saved eip)
-+0xbfffea78 EBP
++0xbfffea7c 0x08049f14 (RA=saved eip)
++0xbfffea78 0xbfffeaa8 (EBP)
 +0xbfffea74
 +0xbfffea70
 +0xbfffea6c
+
 *Local variables of main_loop()-------------------------------------------------
 +0xbfffea68 nread
 +0xbfffea64 tbuf
 +0xbfffea60 tbufsz (=309)
-+0xbfffea5c rdbuf
-+0xbfffea58 s
++0xbfffea5c rdbuf (=s + 1021)
++0xbfffea58 s (=279)
 +0xbfffea54 plen
 +0xbfffea50 ulen
 +0xbfffea4c pass
 +0xbfffea48 user
+
+*Unknown------------------------------------------------------------------------
 +0xbfffea44
 +0xbfffea40
++0xbfffea3c
++0xbfffea38
++0xbfffea34
++0xbfffea30
++0xbfffea2c
++0xbfffea28
+
+* rdbuf-------------------------------------------------------------------------
++0xbfffea24 rdbuf[1300]
 ...
-
---------------------------------------------------------------------------------
-
 +0xbfffe5e0 rdbuf[208] (NOTE. 0xbfffe5e1=rdbuf[209] not, rdbuf[207]!!!)
 ...
-+0xbfffe510 rdbuf
++0xbfffe510 rdbuf[0]
 
 --------------------------------------------------------------------------------
+* Unknown
+...
+
+* tbuf--------------------------------------------------------------------------
 +0xbfffe4f4 ESP+   = tbuf[308]
 ...
 +0xbfffe3d4 ESP+14 = 0x1e
 +0xbfffe3d0 ESP+10 = 0x8
 +0xbfffe3cc ESP+c  = 0xb7ff1eaa
-+0xbfffe3c8 ESP+8  = 0x1eSAVED BP?? Q: Why is this value 
++0xbfffe3c8 ESP+8  = 0x1e
 +0xbfffe3c4 ESP+4  = 0xb7d6858
 +0xbfffe3c0 ESP    = 0xb7fff000 (verifies with p/x *0xbfffe3c0 THIS IS "tbuf"!!! since its size is 309(tbufsz)
 		   = tbuf[0]
---------------------------------------------------------------------------------
-LOW ADDRESS!!!
 
-* Now lets identify the variables
-read()
-0
-rdbuf
-s-1
+* g() params--------------------------------------------------------------------
++0xbfffe3bc 0x4
++0xbfffe3b8 0xb7fd4e0c
++0xbfffe3b4 0x4
++0xbfffe3b0 0xb7fd4f0c
++0xbfffe3ac 0x08049d6f (RA)
+
+* Inside g()--------------------------------------------------------------------
++0xbfffe3a8 0xbfffea78 (EBP)
++0xbfffe39c 0xbfffeac0 s2(\001)
++0xbfffe398 0x0804a239 s1(/bin/ls)
++0xbfffe394 0x0        authd
++0xbfffe390 0xb7fbbcc0 (ESP)
+
+* auth() params-----------------------------------------------------------------
++0xbfffe38c 0x4        plen
++0xbfffe388 0xb7fd4e0c
++0xbfffe384 0x4
++0xbfffe380 0xb7fd4f0c
++0xbfffe37c 0x08048968 (RA)
+
+* Inside auth()-----------------------------------------------------------------
++0xbfffe378 (EBP)
++0xbfffe374 0x0804a2f9 ???
++0xbfffe370 0xbf7bbcc0 ???
++0xbfffe36c 0xca30df00 ???
++0xbfffe368 0x4        l (LOCAL VAR)
++0xbfffe364 0xbfffe1d0 user (LOCAL VARIABLE)
++0xbfffe360 0xb7fbbcc0 ???
++0xbfffe35c 0xb7fd4f0c username
++0xbfffe358 0xb7fd4e0c pass
++0xbfffe354 0x4        ulen
++0xbfffe350 (ESP)
+
+LOW ADDRESS!!!
 
