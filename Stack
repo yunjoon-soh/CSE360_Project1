@@ -3,16 +3,6 @@
 +NOTE. gdb vuln-----------------------------------------------------------------
 |break 95 (read from user starts)
 |-------------------------------------------------------------------------------
-*Local variables of main_loop()-------------------------------------------------
-nread
-user
-pass
-ulen
-plen
-s
-rdbuf
-tbuf
-tbufsz
 --------------------------------------------------------------------------------
 * Observation: 87 bytes before the start of rdbuf
 - this can be checked by printing 88 %X (%08X might not work because of the rdbuf overflow)
@@ -74,7 +64,57 @@ $10 = 0xbfffef88
 (gdb) print rdbuf
 $11 = 0xbfffea40 "e %X\nZ\332\002P\006"
 --------------------------------------------------------------------------------
+* Observation: location of the $ebp and $esp
+(gdb) p $ebp
+$1 = (void *) 0xbfffea78 
+(gdb) p $esp 
+$2 = (void *) 0xbfffe3c0
+So basically, from $esp(closer to top of the stack) to $ebp(further from the top of the stack)
+is the frame for main_loop()
+
+HIGH ADDRESS!!!
+
 --------------------------------------------------------------------------------
+
+...
++0xbfffea80 0x5
++0xbfffea7c 0x8049f14 (RA=saved eip)
++0xbfffea78 EBP
++0xbfffea74
++0xbfffea70
++0xbfffea6c
+*Local variables of main_loop()-------------------------------------------------
++0xbfffea68 nread
++0xbfffea64 tbuf
++0xbfffea60 tbufsz (=309)
++0xbfffea5c rdbuf
++0xbfffea58 s
++0xbfffea54 plen
++0xbfffea50 ulen
++0xbfffea4c pass
++0xbfffea48 user
++0xbfffea44
++0xbfffea40
+...
+
+--------------------------------------------------------------------------------
+
++0xbfffe5e0 rdbuf[208] (NOTE. 0xbfffe5e1=rdbuf[209] not, rdbuf[207]!!!)
+...
++0xbfffe510 rdbuf
+
+--------------------------------------------------------------------------------
++0xbfffe4f4 ESP+   = tbuf[308]
+...
++0xbfffe3d4 ESP+14 = 0x1e
++0xbfffe3d0 ESP+10 = 0x8
++0xbfffe3cc ESP+c  = 0xb7ff1eaa
++0xbfffe3c8 ESP+8  = 0x1eSAVED BP?? Q: Why is this value 
++0xbfffe3c4 ESP+4  = 0xb7d6858
++0xbfffe3c0 ESP    = 0xb7fff000 (verifies with p/x *0xbfffe3c0 THIS IS "tbuf"!!! since its size is 309(tbufsz)
+		   = tbuf[0]
+--------------------------------------------------------------------------------
+LOW ADDRESS!!!
 
 * Now lets identify the variables
 read()
