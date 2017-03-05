@@ -6,6 +6,7 @@ ARGC=len(sys.argv) # python does not have argc
 
 if(ARGC < 2):
 	print 'Usage: ' + sys.argv[0] + ' [NUMBER OF %08X]'
+	print 'Usage: ' + sys.argv[0] + ' [STARTING NUMBER I FOR %I$8X] [ENDING NUMBER J FOR %J$8X]'
 	exit(1)
 
 # base of the string

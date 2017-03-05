@@ -5,6 +5,7 @@
 # executables
 driver*
 vuln
+a.out
 
 # VIM backup file
 *.swp

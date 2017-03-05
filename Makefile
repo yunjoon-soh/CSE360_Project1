@@ -12,6 +12,7 @@ vuln.o: padding.h vuln.c my_malloc.h
 
 vuln.s: vuln.c my_malloc.h
 	gcc $(CFLAGS) -DASM_ONLY -Wa,-adhln -c vuln.c > vuln.s
+	rm vuln.o
 
 my_malloc.o: my_malloc.h my_malloc.c
 	gcc $(CFLAGS)  -c my_malloc.c

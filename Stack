@@ -79,11 +79,11 @@ HIGH ADDRESS!!!
 +0xbfffeaa8 
 ...
 +0xbfffea80 0x5
-+0xbfffea7c 0x08049f14 (RA=saved eip)
-+0xbfffea78 0xbfffeaa8 (EBP)
-+0xbfffea74
-+0xbfffea70
-+0xbfffea6c
++0xbfffea7c 0x08049f14 (RA=saved eip) 431
++0xbfffea78 0xbfffeaa8 (EBP) 430
++0xbfffea74 0x100
++0xbfffea70 0x100
++0xbfffea6c 0x86d9f100 (CANARY?) 427
 
 *Local variables of main_loop()-------------------------------------------------
 +0xbfffea68 nread
@@ -115,7 +115,12 @@ HIGH ADDRESS!!!
 
 --------------------------------------------------------------------------------
 * Unknown
-...
++0xbfffe50c
++0xbfffe508
++0xbfffe504
++0xbfffe500
++0xbfffe4fc
++0xbfffe4f8
 
 * tbuf--------------------------------------------------------------------------
 +0xbfffe4f4 ESP+   = tbuf[308]
