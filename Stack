@@ -167,5 +167,11 @@ HIGH ADDRESS!!!
 +0xbfffe354 0x4        ulen
 +0xbfffe350 (ESP)
 
+* Right before calling strcmp(user, pass, l)
+│0x80488f4 <auth+139>    pushl  -0x10(%ebp) l
+│0x80488f7 <auth+142>    pushl  -0x20(%ebp) pass
+│0x80488fa <auth+145>    pushl  -0x14(%ebp) user
+
+
 LOW ADDRESS!!!
 
