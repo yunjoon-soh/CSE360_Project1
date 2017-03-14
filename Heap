@@ -1,0 +1,133 @@
+* u 1111
+--------------------------
+HEAP BLOCK(u 1234)
+--------------------------
+
+* p aaaa
+  p bbbb
+  u 2222
+
+HIGH ADDR
+--------------------------f00
+HEAP BLOCK(u 1234) NEXT: e00
+--------------------------
+--------------------------e00
+HEAP BLOCK(p aaaa) NEXT: d00
+--------------------------
+--------------------------d00
+HEAP BLOCK(p bbbb) NEXT: c00
+--------------------------
+--------------------------c00
+HEAP BLOCK(u 5678) NEXT: b00
+--------------------------
+LOW ADDR
+
+* free(pass)
+
+HIGH ADDR
+--------------------------f00
+HEAP BLOCK(u 1111) NEXT: e00
+--------------------------
+--------------------------e00
+HEAP BLOCK(p aaaa) NEXT: d00
+--------------------------
+--------------------------d00
+HEAP BLOCK(p XXXX) NEXT: b00 PREV: 0x0
+--------------------------
+--------------------------c00 HEAD OF THE LIST
+HEAP BLOCK(u 2222) NEXT: b00
+--------------------------
+LOW ADDR
+
+* free(user)
+
+HIGH ADDR
+--------------------------f00
+HEAP BLOCK(u 1234) NEXT: e00
+--------------------------
+--------------------------e00
+HEAP BLOCK(p aaaa) NEXT: d00
+--------------------------
+--------------------------d00
+HEAP BLOCK(p XXXX) NEXT: b00 PREV: 0x0
+--------------------------
+--------------------------c00
+HEAP BLOCK(u XXXX) NEXT: b00
+--------------------------
+
+* heap_delete(d00) // caused because of the merge
+
+--------------------------f00
+HEAP BLOCK(u 1234) NEXT: e00
+--------------------------
+--------------------------e00, d00
+HEAP BLOCK(p aaaa) NEXT: d00 PREV: NULL
+// HEAP BLOCK(p XXXX) NEXT: b00 PREV: 0x0
+--------------------------
+--------------------------c00
+HEAP BLOCK(u XXXX) NEXT: b00
+--------------------------
+--------------------------b00 HEAD OF THE LIST
+HEAP BLOCK(X XXXX) NEXT: a00 PREV: 
+--------------------------
+
+(gdb) p *(heap_block*) 0xb7fd4f00
+$28 = {in_use = 1, size = 244, prev_size = 244, prev = 0x31313131, next = 0xb7fd4e00}
+(gdb) p *(heap_block*) 0xb7fd4e00
+$29 = {in_use = 1, size = 244, prev_size = 244, prev = 0x61616161, next = 0xb7fd4d00}
+(gdb) p *(heap_block*) 0xb7fd4d00
+$30 = {in_use = 0, size = 244, prev_size = 244, prev = 0x0, next = 0xb7fd4b00}
+(gdb) p *(heap_block*) 0xb7fd4c00
+$31 = {in_use = 1, size = 508, prev_size = 244, prev = 0x32323232, next = 0xb7fd4b00}
+(gdb) p *(heap_block*) 0xb7fd4b00
+$32 = {in_use = 0, size = 244, prev_size = 244, prev = 0x0, next = 0xb7fd4a00}
+
+* heap_insert(c00)
+
+(gdb) p *(heap_block*) 0xb7fd4f00
+$36 = {in_use = 1, size = 244, prev_size = 244, prev = 0x31313131, next = 0xb7fd4e00}
+(gdb) p *(heap_block*) 0xb7fd4e00
+$37 = {in_use = 1, size = 244, prev_size = 244, prev = 0x61616161, next = 0xb7fd4d00}
+(gdb) p *(heap_block*) 0xb7fd4d00
+$38 = {in_use = 0, size = 244, prev_size = 244, prev = 0x0, next = 0xb7fd4b00}
+(gdb) p *(heap_block*) 0xb7fd4c00
+$39 = {in_use = 0, size = 508, prev_size = 244, prev = 0x0, next = 0xb7fd4b00} // c00 is HEAD OF THE LIST
+(gdb) p *(heap_block*) 0xb7fd4b00
+$40 = {in_use = 0, size = 244, prev_size = 244, prev = 0xb7fd4c00, next = 0xb7fd4a00}
+(gdb) p *(heap_block*) 0xb7fd4a00
+$41 = {in_use = 0, size = 244, prev_size = 244, prev = 0xb7fd4b00, next = 0xb7fd4900}
+
+* What I have to do.
+1: BLOCK p inUse=1 NEXT: 2 PREV: ??
+2: BLOCK p inUse=1 NEXT: 3 PREV: INJECTED_CODE_LOC(on stack)
+3: BLOCK u inUse=1 NEXT: 4 PREV: RA_LOC
+
+* after free(p):
+1: BLCOK ? inUse=1 NEXT: 2 PREV: ??
+2: BLOCK p inUse=0 NEXT: 3 PREV: INJECTED_CODE_LOC(on stack)
+3: BLOCK u inUse=1 NEXT: 4 PREV: RA_LOC
+
+* when free(u), inside my_free, variable next becomes 2 and heap_delete(next(which is 2)) is called
+1: BLCOK ? inUse=1
+2: BLOCK p inUse=0 PREV: INJECTED_CODE_LOC(on stack)
+3: BLOCK u inUse=1 PREV: RA_LOC
+
+* during heap_delete(2)
+1: BLCOK ? inUse=1 NEXT: 2 PREV: ??
+2: BLOCK p inUse=0 NEXT: 3 PREV: INJECTED_CODE_LOC(on stack)
+3: BLOCK u inUse=0 NEXT: 4 PREV: RA_LOC
+
+-------------------- Following line is called
+2->next->prev = 2->prev
+--------------------
+
+* Which acutally means...
+--------------------
+RA_LOC = INJECTED_CODE_LOC
+--------------------
+
+
+
+
+
+
