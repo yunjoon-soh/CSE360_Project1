@@ -1,3 +1,3 @@
-mov  $0x08049a9f, %eax
+mov  $0x0, %eax
 jmp *%eax
 

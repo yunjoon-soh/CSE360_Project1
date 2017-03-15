@@ -42,5 +42,5 @@ padding.h:
 	./mkpad $(GRP_ID)
 
 clean:
-	rm -f vuln vuln.o my_malloc.o vuln.s padding.h driver_authd_expl driver driver_smash_data driver_heap driver_return_to_libc driver_dan_format_string driver_format_string driver_heap_code_injection driver_stack_code_injection
+	rm -f vuln vuln.o my_malloc.o vuln.s padding.h driver_authd_expl driver driver_smash_data driver_heap driver_return_to_libc driver_dan_format_string driver_format_string driver_heap_code_injection driver_stack_code_injection a.out
 

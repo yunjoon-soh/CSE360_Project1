@@ -1,4 +1,4 @@
-mov %eax, %ebp
-sub %eax, 0x475
+mov %ebp, %eax
+sub 0x475, %eax
 jmp *%eax
 nop

